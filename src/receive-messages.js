@@ -1,0 +1,31 @@
+require('dotenv/config')
+const AWS = require('aws-sdk')
+AWS.config.update({region: 'us-east-1'})
+
+const sqs = new AWS.SQS();
+
+(async () => {
+    const messages = await sqs.receiveMessage({
+        QueueUrl: process.env.SQS_URL,
+        MaxNumberOfMessages: 10,
+        WaitTimeSeconds: 20
+    }).promise();
+
+    if (messages.Messages) {
+        messages.Messages.forEach(async message => {
+            try {
+                const body = JSON.parse(message.Body);
+                console.log('processando mensagem...');
+                console.log(`realizando transferência da conta ${body.conta_origem.numero_conta} para a conta ${body.conta_destino.numero_conta}`);
+                console.log(`transferência no valor de ${body.valor} ${body.moeda} efetivada!`);
+                await sqs.deleteMessage({
+                    QueueUrl: process.env.SQS_URL,
+                    ReceiptHandle: message.ReceiptHandle
+                }).promise();
+                console.log('mensagem processada (e excluída) com sucesso!');
+            } catch (e) {
+                throw new Error('Mensagem não está no formato JSON');
+            }
+        })
+    }
+})();
